@@ -24,7 +24,11 @@ impl display {
     }
 
     pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
-        let result = self.pixles[(x as i32 * self.rows + y as i32 * self.columns) as usize] ^ value;
+        let normalized_x = x % self.rows as u8;
+        let normalized_y = y % self.columns as u8;
+        let result = self.pixles
+            [(normalized_x as i32 * self.rows + normalized_y as i32 * self.columns) as usize]
+            ^ value;
         self.pixles[(x as i32 * self.rows + y as i32 * self.columns) as usize] = result;
         return result != value;
     }
