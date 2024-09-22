@@ -1,6 +1,7 @@
 use std::u8;
 
 use crate::display;
+use macroquad::miniquad::date;
 use rand::Rng;
 
 pub struct cpu {
@@ -48,7 +49,7 @@ impl Default for cpu {
             index: Default::default(),
             delay_timer: Default::default(),
             sound_timer: Default::default(),
-            pc: Default::default(),
+            pc: 0x200,
             sp: Default::default(),
             stack: Default::default(),
             paused: false,
@@ -71,8 +72,7 @@ impl cpu {
                 }
             }
             0x1000 => {
-                self.pc = self.stack.pop().unwrap();
-                self.sp -= 1;
+                self.pc = 0x0fff & instruction;
             }
             0x2000 => {
                 self.stack.push(self.pc);
@@ -175,11 +175,11 @@ impl cpu {
             0xD000 => {
                 let mut erased = false;
                 let nibble: u16 = instruction & 0x000f;
+                let mut h = y;
                 for i in 0..nibble {
                     let mut pixel = self.memory[(i + self.index) as usize];
-                    for _ in 0..8 {
-                        let result = self.display.set_pixel(x as u8, y as u8, pixel >> 7);
-
+                    for i in 0..8 {
+                        let result = self.display.set_pixel((x + i) as u8, h as u8, pixel >> 7);
                         pixel = pixel << 1;
 
                         if erased != true && result == true {
@@ -187,10 +187,11 @@ impl cpu {
                             self.registers[0xf] = 1;
                         }
                     }
+                    h += 1;
                 }
             }
             0xE000 => {
-                todo!();
+                // todo!();
                 let keypress = instruction & 0x00ff;
                 if keypress == 0x9e {
                 } else if keypress == 0xa1 {
@@ -207,7 +208,7 @@ impl cpu {
                         self.registers[x] = 0;
                         self.paused = false;
                     }
-                    todo!();
+                    // todo!();
                 }
                 0x15 => {
                     self.delay_timer = self.registers[x];
@@ -242,5 +243,21 @@ impl cpu {
                 println!("error")
             }
         }
+    }
+
+    pub fn read_rom(&mut self, file_data: Vec<u8>) {
+        let initial: u16 = 0x200;
+        for (i, data) in file_data.iter().enumerate() {
+            self.memory[(initial + i as u16) as usize] = data.clone();
+        }
+    }
+
+    pub fn cycle(&mut self) {
+        let mut instruction: u16 = self.memory[self.pc as usize] as u16;
+        instruction = instruction << 8;
+        instruction |= self.memory[(self.pc + 1) as usize] as u16;
+        // println!("instruction {:#08x}", instruction);
+        self.get_op_code(instruction);
+        self.display.render();
     }
 }
