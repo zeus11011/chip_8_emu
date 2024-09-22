@@ -24,9 +24,9 @@ impl display {
     }
 
     pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
-        println!("x{} y{} val {}", x, y, self.pixles[x as usize][y as usize]);
-        let normalized_x = x;
-        let normalized_y = y;
+        // println!("x{} y{} val {}", x, y, self.pixles[x as usize][y as usize]);
+        let normalized_x = x % 32;
+        let normalized_y = y % 64;
         let result = self.pixles[normalized_x as usize][normalized_y as usize] ^ value;
         self.pixles[normalized_x as usize][normalized_y as usize] = result;
         return result != value;
@@ -36,8 +36,8 @@ impl display {
         for i in 0..32 {
             for j in 0..64 {
                 macroquad::shapes::draw_rectangle(
-                    j as f32 * self.scale,
                     i as f32 * self.scale,
+                    j as f32 * self.scale,
                     self.scale,
                     self.scale,
                     if self.pixles[i][j] == 0 {

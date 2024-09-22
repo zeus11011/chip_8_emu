@@ -174,21 +174,23 @@ impl cpu {
             }
             0xD000 => {
                 let mut erased = false;
-                let nibble: u16 = instruction & 0x000f;
-                let mut h = y;
-                for i in 0..nibble {
-                    let mut pixel = self.memory[(i + self.index) as usize];
-                    for i in 0..8 {
-                        let result = self.display.set_pixel((x + i) as u8, h as u8, pixel >> 7);
-                        pixel = pixel << 1;
+                // let nibble: u16 = instruction & 0x000f;
+                let mut h = self.registers[y];
+                // for i in 0..nibble {
+                let mut pixel = self.memory[self.index as usize];
+                for i in 0..(instruction & 0x000f) {
+                    let result =
+                        self.display
+                            .set_pixel((self.registers[x] + i) as u8, h as u8, pixel >> 7);
+                    pixel = pixel << 1;
 
-                        if erased != true && result == true {
-                            erased = true;
-                            self.registers[0xf] = 1;
-                        }
+                    if erased != true && result == true {
+                        erased = true;
+                        self.registers[0xf] = 1;
                     }
-                    h += 1;
                 }
+                h += 1;
+                // }
             }
             0xE000 => {
                 // todo!();
@@ -254,9 +256,13 @@ impl cpu {
 
     pub fn cycle(&mut self) {
         let mut instruction: u16 = self.memory[self.pc as usize] as u16;
+
         instruction = instruction << 8;
         instruction |= self.memory[(self.pc + 1) as usize] as u16;
         // println!("instruction {:#08x}", instruction);
+        // if instruction & 0xf000 == 0xd000 {
+        println!("instruction {:#08x} ", instruction);
+        // }
         self.get_op_code(instruction);
         self.display.render();
     }

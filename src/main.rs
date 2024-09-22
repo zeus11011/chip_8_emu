@@ -19,7 +19,7 @@ async fn main() {
     request_new_screen_size(64.0 * 20.0, 32.0 * 20.0);
     clear_background(BLACK);
     loop {
-        if current_time.elapsed().as_millis() > 100 {
+        if current_time.elapsed().as_millis() > 30 {
             current_time = Instant::now();
             chip_8.cycle();
             next_frame().await
