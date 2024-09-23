@@ -111,7 +111,7 @@ impl cpu {
                 1 => self.registers[x] = self.registers[x] | self.registers[y],
                 2 => self.registers[x] = self.registers[x] & self.registers[y],
                 3 => self.registers[x] = self.registers[x] ^ self.registers[y],
-                4 => match (self.registers[x] as u8).checked_add(self.registers[y] as u8) {
+                4 => match (self.registers[x]).checked_add(self.registers[y]) {
                     Some(sum) => {
                         self.registers[0xf] = 0;
                         self.registers[x] = sum;
@@ -130,7 +130,7 @@ impl cpu {
                 }
                 6 => {
                     self.registers[0xf] = self.registers[x] & 0x0001;
-                    self.registers[x] >>= 1;
+                    self.registers[x] /= 2;
                 }
                 7 => {
                     if self.registers[y] > self.registers[x] {
@@ -141,12 +141,8 @@ impl cpu {
                     self.registers[x] = self.registers[y].checked_sub(self.registers[x]).unwrap();
                 }
                 0xe => {
-                    let msb = (self.registers[x] >> 4) & 0x0008;
-                    if msb == 0x0008 {
-                        self.registers[0xf] = 0x0001;
-                    } else {
-                        self.registers[0xf] = 0x0000;
-                    }
+                    let msb = (self.registers[x] >> 7) & 0x0001;
+                    self.registers[0xf] = msb;
                     self.registers[x] *= 2;
                 }
                 _ => {}
@@ -169,17 +165,17 @@ impl cpu {
             }
             0xD000 => {
                 self.registers[0xf] = 0;
-                let witdh = 8;
-                let height = instruction & 0x000f;
+                let witdh: u8 = 8;
+                let height: u8 = (instruction & 0x000f) as u8;
 
                 for row in 0..height {
-                    let mut sprite = self.memory[(self.index + row) as usize];
+                    let mut sprite = self.memory[(self.index + row as u16) as usize];
 
                     for col in 0..witdh {
                         if (sprite & 0x80) > 0 {
                             let flipped = self.display.set_pixel(
                                 (self.registers[x] + col),
-                                (self.registers[y] + row as u8),
+                                (self.registers[y] + row),
                                 1,
                             );
                             if flipped {

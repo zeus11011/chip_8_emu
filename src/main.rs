@@ -11,7 +11,7 @@ use macroquad::prelude::*;
 async fn main() {
     let mut current_time = Instant::now();
     let mut chip_8 = cpu::cpu::default();
-    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/programs/chip_logo.ch8").unwrap();
+    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/programs/PICTURE").unwrap();
     chip_8.read_rom(rom);
     // loop {
 
