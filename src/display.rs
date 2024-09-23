@@ -29,7 +29,7 @@ impl display {
         let normalized_y = y % 64;
         let result = self.pixles[normalized_x as usize][normalized_y as usize] ^ value;
         self.pixles[normalized_x as usize][normalized_y as usize] = result;
-        return result != value;
+        return result == 0 || result != value;
     }
 
     pub fn render(&self) {

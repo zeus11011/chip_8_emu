@@ -7,7 +7,7 @@ use rand::Rng;
 pub struct cpu {
     display: display::display,
     memory: [u8; 4098],
-    registers: [u16; 16],
+    registers: [u8; 16],
     index: u16,
     delay_timer: u16,
     sound_timer: u16,
@@ -69,6 +69,9 @@ impl cpu {
                     self.display.clear();
                 } else if instruction == 0x00EE {
                     self.pc = self.stack.pop().unwrap();
+                    if self.sp != 0 {
+                        self.sp -= 1;
+                    }
                 }
             }
             0x1000 => {
@@ -80,13 +83,13 @@ impl cpu {
             }
             0x3000 => {
                 let kk = instruction & 0x00ff;
-                if self.registers[x] == kk {
+                if self.registers[x] == kk as u8 {
                     self.pc += 2
                 }
             }
             0x4000 => {
                 let kk = instruction & 0x00ff;
-                if self.registers[x] != kk {
+                if self.registers[x] != kk as u8 {
                     self.pc += 2;
                 }
             }
@@ -97,45 +100,37 @@ impl cpu {
             }
             0x6000 => {
                 let kk = instruction & 0x00ff;
-                self.registers[x] = kk;
+                self.registers[x] = kk as u8;
             }
             0x7000 => {
                 let kk = instruction & 0x00ff;
-                self.registers[x] += kk;
+                self.registers[x] += kk as u8;
             }
             0x8000 => match instruction & 0x000f {
                 0 => self.registers[x] = self.registers[y],
                 1 => self.registers[x] = self.registers[x] | self.registers[y],
                 2 => self.registers[x] = self.registers[x] & self.registers[y],
                 3 => self.registers[x] = self.registers[x] ^ self.registers[y],
-                4 => match self.registers[x].checked_add(self.registers[y]) {
+                4 => match (self.registers[x] as u8).checked_add(self.registers[y] as u8) {
                     Some(sum) => {
                         self.registers[0xf] = 0;
                         self.registers[x] = sum;
                     }
                     None => {
                         self.registers[0xf] = 1;
-                        self.registers[x] = 0xffff;
+                        self.registers[x] = 0xff;
                     }
                 },
-                5 => match self.registers[x].checked_sub(self.registers[y]) {
-                    Some(sum) => {
-                        self.registers[x] = sum;
-                        self.registers[0xf] = 1
+                5 => {
+                    self.registers[0xf] = 0;
+                    if self.registers[x] > self.registers[y] {
+                        self.registers[0xf] = 1;
                     }
-                    None => {
-                        self.registers[0xf] = 0;
-                        self.registers[x] = 0x0000
-                    }
-                },
+                    self.registers[x] -= self.registers[y]
+                }
                 6 => {
-                    let lsb = self.registers[x] & 0x0001;
-                    if lsb == 0x0001 {
-                        self.registers[0xf] = 0x0001;
-                    } else {
-                        self.registers[0xf] = 0x0000;
-                    }
-                    self.registers[x] /= 2;
+                    self.registers[0xf] = self.registers[x] & 0x0001;
+                    self.registers[x] >>= 1;
                 }
                 7 => {
                     if self.registers[y] > self.registers[x] {
@@ -146,7 +141,7 @@ impl cpu {
                     self.registers[x] = self.registers[y].checked_sub(self.registers[x]).unwrap();
                 }
                 0xe => {
-                    let msb = (self.registers[x] >> 12) & 0x0008;
+                    let msb = (self.registers[x] >> 4) & 0x0008;
                     if msb == 0x0008 {
                         self.registers[0xf] = 0x0001;
                     } else {
@@ -165,32 +160,35 @@ impl cpu {
                 self.index = instruction & 0x0fff;
             }
             0xB000 => {
-                self.pc = self.registers[0] + (instruction & 0x0fff);
+                self.pc = (self.registers[0] as u16 + (instruction & 0x0fff));
             }
             0xC000 => {
                 let kk = instruction & 0x00ff;
                 let random_num: u8 = rand::thread_rng().gen();
-                self.registers[x] = random_num as u16 & kk;
+                self.registers[x] = random_num & kk as u8;
             }
             0xD000 => {
-                let mut erased = false;
-                // let nibble: u16 = instruction & 0x000f;
-                let mut h = self.registers[y];
-                // for i in 0..nibble {
-                let mut pixel = self.memory[self.index as usize];
-                for i in 0..(instruction & 0x000f) {
-                    let result =
-                        self.display
-                            .set_pixel((self.registers[x] + i) as u8, h as u8, pixel >> 7);
-                    pixel = pixel << 1;
+                self.registers[0xf] = 0;
+                let witdh = 8;
+                let height = instruction & 0x000f;
 
-                    if erased != true && result == true {
-                        erased = true;
-                        self.registers[0xf] = 1;
+                for row in 0..height {
+                    let mut sprite = self.memory[(self.index + row) as usize];
+
+                    for col in 0..witdh {
+                        if (sprite & 0x80) > 0 {
+                            let flipped = self.display.set_pixel(
+                                (self.registers[x] + col),
+                                (self.registers[y] + row as u8),
+                                1,
+                            );
+                            if flipped {
+                                self.registers[0xf] = 1;
+                            }
+                        }
+                        sprite = sprite << 1;
                     }
                 }
-                h += 1;
-                // }
             }
             0xE000 => {
                 // todo!();
@@ -201,33 +199,33 @@ impl cpu {
             }
             0xf000 => match instruction & 0x00ff {
                 0x07 => {
-                    self.registers[x] = self.delay_timer;
+                    self.registers[x] = self.delay_timer as u8;
                 }
                 0x0A => {
-                    self.paused = true;
+                    // self.paused = true;
 
-                    if true {
-                        self.registers[x] = 0;
-                        self.paused = false;
-                    }
+                    // if true {
+                    //     self.registers[x] = 0;
+                    //     self.paused = false;
+                    // }
                     // todo!();
                 }
                 0x15 => {
-                    self.delay_timer = self.registers[x];
+                    self.delay_timer = self.registers[x] as u16;
                 }
                 0x18 => {
-                    self.sound_timer = self.registers[x];
+                    self.sound_timer = self.registers[x] as u16;
                 }
                 0x1E => {
-                    self.index += self.registers[x];
+                    self.index += self.registers[x] as u16;
                 }
                 0x29 => {
-                    self.index = (x * 5) as u16;
+                    self.index = (self.registers[x] * 5) as u16;
                 }
                 0x33 => {
-                    self.memory[self.index as usize] = ((x / 100) % 10) as u8;
-                    self.memory[self.index as usize + 1] = ((x / 10) % 10) as u8;
-                    self.memory[self.index as usize + 2] = (x % 10) as u8;
+                    self.memory[self.index as usize] = (self.registers[x] / 100) as u8;
+                    self.memory[self.index as usize + 1] = ((self.registers[x] % 100) / 10) as u8;
+                    self.memory[self.index as usize + 2] = (self.registers[x] % 10) as u8;
                 }
                 0x55 => {
                     for i in 0..x + 1 {
@@ -236,7 +234,7 @@ impl cpu {
                 }
                 0x65 => {
                     for i in 0..x + 1 {
-                        self.registers[i] = self.memory[self.index as usize + i] as u16;
+                        self.registers[i] = self.memory[self.index as usize + i];
                     }
                 }
                 _ => {}
@@ -260,9 +258,9 @@ impl cpu {
         instruction = instruction << 8;
         instruction |= self.memory[(self.pc + 1) as usize] as u16;
         // println!("instruction {:#08x}", instruction);
-        // if instruction & 0xf000 == 0xd000 {
-        println!("instruction {:#08x} ", instruction);
-        // }
+        if instruction & 0xf000 == 0xd000 {
+            println!("instruction {:#08x} ", instruction);
+        }
         self.get_op_code(instruction);
         self.display.render();
     }
