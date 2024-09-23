@@ -24,7 +24,6 @@ impl display {
     }
 
     pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
-        println!("len {}", self.pixles.len());
         let normalized_x = x % 64;
         let normalized_y = y % 32;
         let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
