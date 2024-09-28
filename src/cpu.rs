@@ -1,6 +1,8 @@
 use std::u8;
 
 use crate::display;
+use crate::keyboard::Keyboard_Firm;
+use macroquad::input::{get_char_pressed, get_keys_pressed, get_keys_released};
 use macroquad::miniquad::date;
 use rand::Rng;
 
@@ -16,6 +18,7 @@ pub struct cpu {
     stack: Vec<u16>,
     paused: bool,
     speed: u8,
+    pub keyboard: Keyboard_Firm,
 }
 
 impl Default for cpu {
@@ -54,6 +57,7 @@ impl Default for cpu {
             stack: Default::default(),
             paused: false,
             speed: 10,
+            keyboard: Keyboard_Firm::default(),
         }
     }
 }
@@ -104,7 +108,10 @@ impl cpu {
             }
             0x7000 => {
                 let kk = instruction & 0x00ff;
-                self.registers[x] += kk as u8;
+                match self.registers[x].checked_add(kk as u8) {
+                    Some(sum) => self.registers[x] = sum,
+                    None => self.registers[x] = 0xff,
+                };
             }
             0x8000 => match instruction & 0x000f {
                 0 => self.registers[x] = self.registers[y],
@@ -125,8 +132,11 @@ impl cpu {
                     self.registers[0xf] = 0;
                     if self.registers[x] > self.registers[y] {
                         self.registers[0xf] = 1;
+                        self.registers[x] = 0;
+                        return;
                     }
-                    self.registers[x] -= self.registers[y]
+                    let (total, _) = self.registers[x].overflowing_sub(self.registers[y]);
+                    self.registers[x] = total;
                 }
                 6 => {
                     self.registers[0xf] = self.registers[x] & 0x0001;
@@ -156,7 +166,7 @@ impl cpu {
                 self.index = instruction & 0x0fff;
             }
             0xB000 => {
-                self.pc = (self.registers[0] as u16 + (instruction & 0x0fff));
+                self.pc = self.registers[0] as u16 + (instruction & 0x0fff);
             }
             0xC000 => {
                 let kk = instruction & 0x00ff;
@@ -174,8 +184,8 @@ impl cpu {
                     for col in 0..witdh {
                         if (sprite & 0x80) > 0 {
                             let flipped = self.display.set_pixel(
-                                (self.registers[x] + col),
-                                (self.registers[y] + row),
+                                (self.registers[x] as u16 + col as u16),
+                                (self.registers[y] as u16 + row as u16),
                                 1,
                             );
                             if flipped {
@@ -187,24 +197,39 @@ impl cpu {
                 }
             }
             0xE000 => {
-                // todo!();
                 let keypress = instruction & 0x00ff;
-                if keypress == 0x9e {
-                } else if keypress == 0xa1 {
+
+                if let Some(pressed_key) = self.keyboard.get_key_pressed() {
+                    match keypress as u8 {
+                        0x9e => {
+                            if pressed_key == self.registers[x] {
+                                self.pc += 2;
+                            }
+                        }
+                        0xa1 => {
+                            if pressed_key != self.registers[x] {
+                                self.pc += 2;
+                            }
+                        }
+                        _ => {}
+                    }
+                    return;
                 }
+                self.pc -= 2;
             }
             0xf000 => match instruction & 0x00ff {
                 0x07 => {
                     self.registers[x] = self.delay_timer as u8;
                 }
                 0x0A => {
-                    // self.paused = true;
-
-                    // if true {
-                    //     self.registers[x] = 0;
-                    //     self.paused = false;
-                    // }
-                    // todo!();
+                    self.paused = true;
+                    while self.paused {
+                        if let Some(get_pressed_key) = self.keyboard.get_key_pressed() {
+                            println!("pressed key : {:#02x}", get_pressed_key);
+                            self.registers[x] = get_pressed_key;
+                            self.paused = false;
+                        }
+                    }
                 }
                 0x15 => {
                     self.delay_timer = self.registers[x] as u16;
@@ -249,15 +274,28 @@ impl cpu {
     }
 
     pub fn cycle(&mut self) {
+        // for _ in 0..10 {
+        // }
+        self.keyboard.press_key(get_keys_pressed());
+        self.keyboard.key_up(get_keys_released());
         let mut instruction: u16 = self.memory[self.pc as usize] as u16;
 
         instruction = instruction << 8;
         instruction |= self.memory[(self.pc + 1) as usize] as u16;
-        // println!("instruction {:#08x}", instruction);
-        if instruction & 0xf000 == 0xd000 {
-            println!("instruction {:#08x} ", instruction);
+        if self.paused {
+            self.pc = self.pc - 2;
         }
+        println!("instruction : {:#04x}", instruction);
         self.get_op_code(instruction);
+        if !self.paused {
+            self.update_timer();
+        }
         self.display.render();
+    }
+
+    fn update_timer(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
     }
 }

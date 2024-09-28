@@ -23,7 +23,7 @@ impl display {
         self.pixles = vec![vec![0; self.columns as usize]; self.rows as usize];
     }
 
-    pub fn set_pixel(&mut self, x: u8, y: u8, value: u8) -> bool {
+    pub fn set_pixel(&mut self, x: u16, y: u16, value: u8) -> bool {
         let normalized_x = x % 64;
         let normalized_y = y % 32;
         let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
