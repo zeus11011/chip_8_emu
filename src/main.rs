@@ -12,7 +12,7 @@ mod keyboard;
 async fn main() {
     let mut current_time = Instant::now();
     let mut chip_8 = cpu::cpu::default();
-    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/games/Tank.ch8").unwrap();
+    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/programs/ibm.ch8").unwrap();
     chip_8.read_rom(rom);
     // loop {
 
@@ -21,8 +21,8 @@ async fn main() {
     clear_background(BLACK);
     loop {
         if current_time.elapsed().as_millis() > 17 {
-            current_time = Instant::now();
             chip_8.cycle();
+            current_time = Instant::now();
             next_frame().await
         }
     }

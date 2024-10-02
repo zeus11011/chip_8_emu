@@ -24,11 +24,14 @@ impl display {
     }
 
     pub fn set_pixel(&mut self, x: u16, y: u16, value: u8) -> bool {
-        let normalized_x = x % 64;
-        let normalized_y = y % 32;
-        let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
-        self.pixles[normalized_y as usize][normalized_x as usize] = result;
-        return result == 0 || result != value;
+        if x >= 0 && y >= 0 {
+            let normalized_x = x % 64;
+            let normalized_y = y % 32;
+            let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
+            self.pixles[normalized_y as usize][normalized_x as usize] = result;
+            return result == 0 || result != value;
+        }
+        return false;
     }
 
     pub fn render(&self) {

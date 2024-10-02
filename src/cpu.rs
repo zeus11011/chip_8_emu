@@ -151,7 +151,7 @@ impl cpu {
                     self.registers[x] = self.registers[y].checked_sub(self.registers[x]).unwrap();
                 }
                 0xe => {
-                    let msb = (self.registers[x] >> 7) & 0x0001;
+                    let msb = (self.registers[x] >> 7) & 0x000f;
                     self.registers[0xf] = msb;
                     self.registers[x] *= 2;
                 }
@@ -285,7 +285,12 @@ impl cpu {
         if self.paused {
             self.pc = self.pc - 2;
         }
-        println!("instruction : {:#04x}", instruction);
+        if (self.memory[self.pc as usize] & 0xf0 != 0xe0
+            && self.memory[self.pc as usize] & 0x0f == 0x03)
+            || (self.memory[(self.pc + 1) as usize] & 0xf0 == 0x40)
+        {
+            println!("instruction : {:#04x}", instruction);
+        }
         self.get_op_code(instruction);
         if !self.paused {
             self.update_timer();
