@@ -2,8 +2,7 @@ use std::u8;
 
 use crate::display;
 use crate::keyboard::Keyboard_Firm;
-use macroquad::input::{get_char_pressed, get_keys_pressed, get_keys_released};
-use macroquad::miniquad::date;
+use macroquad::input::{get_keys_pressed, get_keys_released};
 use rand::Rng;
 
 pub struct cpu {
@@ -184,8 +183,8 @@ impl cpu {
                     for col in 0..witdh {
                         if (sprite & 0x80) > 0 {
                             let flipped = self.display.set_pixel(
-                                (self.registers[x] as u16 + col as u16),
-                                (self.registers[y] as u16 + row as u16),
+                                self.registers[x] as u16 + col as u16,
+                                self.registers[y] as u16 + row as u16,
                                 1,
                             );
                             if flipped {

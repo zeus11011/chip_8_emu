@@ -3,7 +3,7 @@ mod display;
 // use crate::display;
 // mod keyboard;
 
-use std::{char, fs, time::Instant};
+use std::{fs, time::Instant};
 mod cpu;
 use macroquad::prelude::*;
 mod keyboard;

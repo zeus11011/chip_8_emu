@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use macroquad::input::{self, KeyCode};
+use macroquad::input::{KeyCode};
 
 pub struct Keyboard_Firm {
     pressed_keys: Vec<bool>,
