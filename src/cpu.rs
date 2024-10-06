@@ -117,37 +117,36 @@ impl Cpu {
                 1 => self.registers[x] = self.registers[x] | self.registers[y],
                 2 => self.registers[x] = self.registers[x] & self.registers[y],
                 3 => self.registers[x] = self.registers[x] ^ self.registers[y],
-                4 => match (self.registers[x]).checked_add(self.registers[y]) {
-                    Some(sum) => {
-                        self.registers[0xf] = 0;
-                        self.registers[x] = sum;
-                    }
-                    None => {
-                        self.registers[0xf] = 1;
-                        self.registers[x] = 0xff;
-                    }
-                },
+                4 => {
+                    self.registers[0xf] = 0;
+                    self.registers[x]
+                        .checked_add(self.registers[y])
+                        .unwrap_or_else(|| {
+                            self.registers[0xf] = 1;
+                            return 0;
+                        });
+                }
                 5 => {
                     self.registers[0xf] = 0;
                     if self.registers[x] > self.registers[y] {
                         self.registers[0xf] = 1;
-                        self.registers[x] = 0;
-                        return;
                     }
-                    let (total, _) = self.registers[x].overflowing_sub(self.registers[y]);
-                    self.registers[x] = total;
+                    self.registers[x] = self.registers[x]
+                        .checked_sub(self.registers[y])
+                        .unwrap_or(0);
                 }
                 6 => {
                     self.registers[0xf] = self.registers[x] & 0x0001;
-                    self.registers[x] /= 2;
+                    self.registers[x] = self.registers[x].checked_div(2).unwrap();
                 }
                 7 => {
+                    self.registers[0xf] = 0;
                     if self.registers[y] > self.registers[x] {
                         self.registers[0xf] = 1;
-                    } else {
-                        self.registers[0xf] = 0;
                     }
-                    self.registers[x] = self.registers[y].checked_sub(self.registers[x]).unwrap();
+                    self.registers[x] = self.registers[y]
+                        .checked_sub(self.registers[x])
+                        .unwrap_or(0);
                 }
                 0xe => {
                     let msb = (self.registers[x] >> 7) & 0x000f;
@@ -185,7 +184,7 @@ impl Cpu {
                             let flipped = self.display.set_pixel(
                                 self.registers[x] as u16 + col as u16,
                                 self.registers[y] as u16 + row as u16,
-                                1,
+                                sprite & 0x80,
                             );
                             if flipped {
                                 self.registers[0xf] = 1;
