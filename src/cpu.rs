@@ -1,12 +1,12 @@
 use std::u8;
 
 use crate::display;
-use crate::keyboard::Keyboard_Firm;
+use crate::keyboard::KeyboardFirm;
 use macroquad::input::{get_keys_pressed, get_keys_released};
 use rand::Rng;
 
-pub struct cpu {
-    display: display::display,
+pub struct Cpu {
+    display: display::Display,
     memory: [u8; 4098],
     registers: [u8; 16],
     index: u16,
@@ -17,10 +17,10 @@ pub struct cpu {
     stack: Vec<u16>,
     paused: bool,
     speed: u8,
-    pub keyboard: Keyboard_Firm,
+    pub keyboard: KeyboardFirm,
 }
 
-impl Default for cpu {
+impl Default for Cpu {
     fn default() -> Self {
         let mut mem: [u8; 4098] = [0; 4098];
         const FONTSET: [u8; 80] = [
@@ -56,12 +56,12 @@ impl Default for cpu {
             stack: Default::default(),
             paused: false,
             speed: 10,
-            keyboard: Keyboard_Firm::default(),
+            keyboard: KeyboardFirm::default(),
         }
     }
 }
 
-impl cpu {
+impl Cpu {
     pub fn get_op_code(&mut self, instruction: u16) {
         self.pc += 2;
         let x = ((instruction & 0x0f00) >> 8) as usize;
@@ -198,23 +198,20 @@ impl cpu {
             0xE000 => {
                 let keypress = instruction & 0x00ff;
 
-                if let Some(pressed_key) = self.keyboard.get_key_pressed() {
-                    match keypress as u8 {
-                        0x9e => {
-                            if pressed_key == self.registers[x] {
-                                self.pc += 2;
-                            }
+                let pressed_key = self.keyboard.is_key_pressed(self.registers[x] as u8);
+                match keypress as u8 {
+                    0x9e => {
+                        if pressed_key {
+                            self.pc += 2;
                         }
-                        0xa1 => {
-                            if pressed_key != self.registers[x] {
-                                self.pc += 2;
-                            }
-                        }
-                        _ => {}
                     }
-                    return;
+                    0xa1 => {
+                        if !pressed_key {
+                            self.pc += 2;
+                        }
+                    }
+                    _ => {}
                 }
-                self.pc -= 2;
             }
             0xf000 => match instruction & 0x00ff {
                 0x07 => {
@@ -272,27 +269,22 @@ impl cpu {
         }
     }
 
-    pub fn cycle(&mut self) {
-        // for _ in 0..10 {
-        // }
-        self.keyboard.press_key(get_keys_pressed());
-        self.keyboard.key_up(get_keys_released());
-        let mut instruction: u16 = self.memory[self.pc as usize] as u16;
+    pub async fn cycle(&mut self) {
+        for _ in 0..10 {
+            self.keyboard.press_key(get_keys_pressed()).await;
+            self.keyboard.key_up(get_keys_released()).await;
+            let mut instruction: u16 = self.memory[self.pc as usize] as u16;
 
-        instruction = instruction << 8;
-        instruction |= self.memory[(self.pc + 1) as usize] as u16;
-        if self.paused {
-            self.pc = self.pc - 2;
-        }
-        if (self.memory[self.pc as usize] & 0xf0 != 0xe0
-            && self.memory[self.pc as usize] & 0x0f == 0x03)
-            || (self.memory[(self.pc + 1) as usize] & 0xf0 == 0x40)
-        {
-            println!("instruction : {:#04x}", instruction);
-        }
-        self.get_op_code(instruction);
-        if !self.paused {
-            self.update_timer();
+            instruction = instruction << 8;
+            instruction |= self.memory[(self.pc + 1) as usize] as u16;
+            if self.paused {
+                self.pc = self.pc - 2;
+            }
+
+            self.get_op_code(instruction);
+            if !self.paused {
+                self.update_timer();
+            }
         }
         self.display.render();
     }

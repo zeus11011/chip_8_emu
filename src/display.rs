@@ -1,13 +1,13 @@
 use macroquad::color;
 
-pub struct display {
+pub struct Display {
     pub pixles: Vec<Vec<u8>>,
     scale: f32,
     rows: i32,
     columns: i32,
 }
 
-impl Default for display {
+impl Default for Display {
     fn default() -> Self {
         Self {
             pixles: vec![vec![0; 64]; 32],
@@ -18,20 +18,17 @@ impl Default for display {
     }
 }
 
-impl display {
+impl Display {
     pub fn clear(&mut self) {
         self.pixles = vec![vec![0; self.columns as usize]; self.rows as usize];
     }
 
     pub fn set_pixel(&mut self, x: u16, y: u16, value: u8) -> bool {
-        if x >= 0 && y >= 0 {
-            let normalized_x = x % 64;
-            let normalized_y = y % 32;
-            let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
-            self.pixles[normalized_y as usize][normalized_x as usize] = result;
-            return result == 0 || result != value;
-        }
-        return false;
+        let normalized_x = x % 64;
+        let normalized_y = y % 32;
+        let result = self.pixles[normalized_y as usize][normalized_x as usize] ^ value;
+        self.pixles[normalized_y as usize][normalized_x as usize] = result;
+        return result == 0 || result != value;
     }
 
     pub fn render(&self) {
@@ -50,5 +47,37 @@ impl display {
                 )
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Display;
+
+    #[test]
+    fn test_pixel_initialzing() {
+        let display = Display::default();
+        assert_eq!(display.pixles[0][0], 0)
+    }
+
+    #[test]
+    fn test_set_pixel() {
+        let mut display = Display::default();
+        assert_eq!(display.set_pixel(10, 10, 1), false);
+        assert_eq!(display.pixles[10][10], 1)
+    }
+
+    #[test]
+    fn test_set_pixel_out_of_boundary() {
+        let mut display = Display::default();
+        assert_eq!(display.set_pixel(65, 33, 1), false);
+        assert_eq!(display.pixles[1][1], 1);
+    }
+
+    #[test]
+    fn test_set_pixel_ored() {
+        let mut display = Display::default();
+        assert_eq!(display.set_pixel(65, 33, 1), false);
+        assert_eq!(display.set_pixel(65, 33, 1), true);
     }
 }

@@ -3,7 +3,7 @@ mod display;
 // use crate::display;
 // mod keyboard;
 
-use std::{fs, time::Instant};
+use std::{char, fs, time::Instant};
 mod cpu;
 use macroquad::prelude::*;
 mod keyboard;
@@ -11,8 +11,8 @@ mod keyboard;
 #[macroquad::main("BasicShapes")]
 async fn main() {
     let mut current_time = Instant::now();
-    let mut chip_8 = cpu::cpu::default();
-    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/programs/ibm.ch8").unwrap();
+    let mut chip_8 = cpu::Cpu::default();
+    let rom = fs::read("/home/zeus/Documents/roms/chip8-roms/games/Tank.ch8").unwrap();
     chip_8.read_rom(rom);
     // loop {
 
@@ -21,7 +21,7 @@ async fn main() {
     clear_background(BLACK);
     loop {
         if current_time.elapsed().as_millis() > 17 {
-            chip_8.cycle();
+            chip_8.cycle().await;
             current_time = Instant::now();
             next_frame().await
         }

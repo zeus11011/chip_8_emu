@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use macroquad::input::{KeyCode};
+use macroquad::input::KeyCode;
 
-pub struct Keyboard_Firm {
+pub struct KeyboardFirm {
     pressed_keys: Vec<bool>,
-    mapped_keys: HashMap<KeyCode, u8>,
+    pub mapped_keys: HashMap<KeyCode, u8>,
 }
 
-impl Default for Keyboard_Firm {
+impl Default for KeyboardFirm {
     fn default() -> Self {
         let mut default_set: HashMap<KeyCode, u8> = HashMap::new();
         default_set.insert(KeyCode::Key1, 0x1);
@@ -26,35 +26,20 @@ impl Default for Keyboard_Firm {
         default_set.insert(KeyCode::X, 0x0);
         default_set.insert(KeyCode::C, 0xb);
         default_set.insert(KeyCode::V, 0xf);
-        // default_set.insert('1', 0x1);
-        // default_set.insert('2', 0x2);
-        // default_set.insert('3', 0x3);
-        // default_set.insert('4', 0xc);
-        // default_set.insert('q', 0x4);
-        // default_set.insert('w', 0x5);
-        // default_set.insert('e', 0x6);
-        // default_set.insert('r', 0xc);
-        // default_set.insert('a', 0x7);
-        // default_set.insert('s', 0x8);
-        // default_set.insert('d', 0x9);
-        // default_set.insert('f', 0xd);
-        // default_set.insert('z', 0xa);
-        // default_set.insert('x', 0x0);
-        // default_set.insert('c', 0xb);
-        // default_set.insert('v', 0xf);
+
         Self {
-            pressed_keys: vec![false; 20],
+            pressed_keys: vec![false; 0xff],
             mapped_keys: default_set,
         }
     }
 }
 
-impl Keyboard_Firm {
+impl KeyboardFirm {
     pub fn is_key_pressed(&mut self, key: u8) -> bool {
         return self.pressed_keys[key as usize];
     }
 
-    pub fn press_key(&mut self, charset: HashSet<KeyCode>) {
+    pub async fn press_key(&mut self, charset: HashSet<KeyCode>) {
         for (_, char) in charset.iter().enumerate() {
             if let Some(code) = self.mapped_keys.get(&char) {
                 self.pressed_keys[*code as usize] = true;
@@ -62,7 +47,7 @@ impl Keyboard_Firm {
         }
     }
 
-    pub fn key_up(&mut self, charset: HashSet<KeyCode>) {
+    pub async fn key_up(&mut self, charset: HashSet<KeyCode>) {
         for (_, char) in charset.iter().enumerate() {
             if let Some(code) = self.mapped_keys.get(&char) {
                 self.pressed_keys[*code as usize] = false;
