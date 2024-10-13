@@ -107,10 +107,9 @@ impl Cpu {
             }
             0x7000 => {
                 let kk = instruction & 0x00ff;
-                match self.registers[x].checked_add(kk as u8) {
-                    Some(sum) => self.registers[x] = sum,
-                    None => self.registers[x] = 0xff,
-                };
+
+                let (sum, _) = self.registers[x].overflowing_add(kk as u8);
+                self.registers[x] = sum
             }
             0x8000 => self.exec_8set(instruction, x, y),
             0x9000 => {
@@ -239,22 +238,17 @@ impl Cpu {
             2 => self.registers[x] = self.registers[x] & self.registers[y],
             3 => self.registers[x] = self.registers[x] ^ self.registers[y],
             4 => {
-                self.registers[0xf] = 0;
-                self.registers[x] = self.registers[x]
-                    .checked_add(self.registers[y])
-                    .unwrap_or_else(|| {
-                        self.registers[0xf] = 1;
-                        return 0xff;
-                    });
+                let (sum, bool) = self.registers[x].overflowing_add(self.registers[y]);
+                self.registers[x] = sum;
+                self.registers[0xf] = if bool { 1 } else { 0 };
             }
             5 => {
                 self.registers[0xf] = 0;
                 if self.registers[x] > self.registers[y] {
                     self.registers[0xf] = 1;
                 }
-                self.registers[x] = self.registers[x]
-                    .checked_sub(self.registers[y])
-                    .unwrap_or(0);
+                let (sum, _) = self.registers[x].overflowing_sub(self.registers[y]);
+                self.registers[x] = sum;
             }
             6 => {
                 self.registers[0xf] = self.registers[x] & 0x0001;
@@ -265,14 +259,15 @@ impl Cpu {
                 if self.registers[y] > self.registers[x] {
                     self.registers[0xf] = 1;
                 }
-                self.registers[x] = self.registers[y]
-                    .checked_sub(self.registers[x])
-                    .unwrap_or(0);
+                let (sum, _) = self.registers[y].overflowing_sub(self.registers[x]);
+                self.registers[x] = sum;
             }
             0xe => {
-                let msb = self.registers[x].reverse_bits() & 0x0001;
+                let msb = self.registers[x] >> 7 & 0x0001;
                 self.registers[0xf] = msb;
-                self.registers[x] *= 2;
+                self.registers[x] = self.registers[x]
+                    .checked_mul(2)
+                    .unwrap_or_else(|| return 0xff);
             }
             _ => {}
         }
@@ -351,7 +346,6 @@ mod test {
         assert_eq!(cpu.registers[2], 0x0);
         assert_eq!(cpu.registers[4], 0x0);
     }
-
     #[test]
     fn test_exec8_4() {
         let mut cpu = Cpu::default();
@@ -365,12 +359,11 @@ mod test {
     fn test_exec8_4_checkf() {
         let mut cpu = Cpu::default();
         cpu.registers[0] = 0xff;
-        cpu.registers[1] = 0xff;
+        cpu.registers[1] = 0x1;
         cpu.exec_8set(0x8004, 0, 1);
-        assert_eq!(cpu.registers[0], 0xff);
+        assert_eq!(cpu.registers[0], 0x0);
         assert_eq!(cpu.registers[0xf], 0x1);
     }
-
     #[test]
     fn test_exec8_5() {
         let mut cpu = Cpu::default();
@@ -380,14 +373,13 @@ mod test {
         assert_eq!(cpu.registers[0], 0xf0);
         assert_eq!(cpu.registers[0xf], 1);
     }
-
     #[test]
     fn test_exec8_5_vxf() {
         let mut cpu = Cpu::default();
         cpu.registers[0] = 0x0f;
         cpu.registers[1] = 0xff;
         cpu.exec_8set(0x8005, 0, 1);
-        assert_eq!(cpu.registers[0], 0x0);
+        assert_eq!(cpu.registers[0], 16);
         assert_eq!(cpu.registers[0xf], 0);
     }
     #[test]
@@ -425,7 +417,7 @@ mod test {
         cpu.registers[0] = 0xff;
         cpu.registers[1] = 7;
         cpu.exec_8set(0x8007, 0, 1);
-        assert_eq!(cpu.registers[0], 0);
+        assert_eq!(cpu.registers[0], 8);
         assert_eq!(cpu.registers[0xf], 0);
     }
     #[test]
@@ -436,5 +428,34 @@ mod test {
         cpu.exec_8set(0x800e, 0, 1);
         assert_eq!(cpu.registers[0], 8);
         assert_eq!(cpu.registers[0xf], 0);
+    }
+    #[test]
+    fn test_exec8_e_vxf() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0xf0;
+        cpu.exec_8set(0x800e, 0, 1);
+        assert_eq!(cpu.registers[0], 0xff);
+        assert_eq!(cpu.registers[0xf], 1);
+    }
+
+    #[test]
+    fn test_execf_33() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 123;
+        cpu.index = 10;
+        cpu.exec_fset(0x0033, 0);
+        assert_eq!(cpu.memory[10], 1);
+        assert_eq!(cpu.memory[11], 2);
+        assert_eq!(cpu.memory[12], 3);
+    }
+    #[test]
+    fn test_execf_33_negative() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 23;
+        cpu.index = 10;
+        cpu.exec_fset(0x0033, 0);
+        assert_eq!(cpu.memory[10], 0);
+        assert_eq!(cpu.memory[11], 2);
+        assert_eq!(cpu.memory[12], 3);
     }
 }
