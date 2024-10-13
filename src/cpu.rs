@@ -112,49 +112,7 @@ impl Cpu {
                     None => self.registers[x] = 0xff,
                 };
             }
-            0x8000 => match instruction & 0x000f {
-                0 => self.registers[x] = self.registers[y],
-                1 => self.registers[x] = self.registers[x] | self.registers[y],
-                2 => self.registers[x] = self.registers[x] & self.registers[y],
-                3 => self.registers[x] = self.registers[x] ^ self.registers[y],
-                4 => {
-                    self.registers[0xf] = 0;
-                    self.registers[x]
-                        .checked_add(self.registers[y])
-                        .unwrap_or_else(|| {
-                            self.registers[0xf] = 1;
-                            return 0;
-                        });
-                }
-                5 => {
-                    self.registers[0xf] = 0;
-                    if self.registers[x] > self.registers[y] {
-                        self.registers[0xf] = 1;
-                    }
-                    self.registers[x] = self.registers[x]
-                        .checked_sub(self.registers[y])
-                        .unwrap_or(0);
-                }
-                6 => {
-                    self.registers[0xf] = self.registers[x] & 0x0001;
-                    self.registers[x] = self.registers[x].checked_div(2).unwrap();
-                }
-                7 => {
-                    self.registers[0xf] = 0;
-                    if self.registers[y] > self.registers[x] {
-                        self.registers[0xf] = 1;
-                    }
-                    self.registers[x] = self.registers[y]
-                        .checked_sub(self.registers[x])
-                        .unwrap_or(0);
-                }
-                0xe => {
-                    let msb = (self.registers[x] >> 7) & 0x000f;
-                    self.registers[0xf] = msb;
-                    self.registers[x] *= 2;
-                }
-                _ => {}
-            },
+            0x8000 => self.exec_8set(instruction, x, y),
             0x9000 => {
                 if self.registers[x] != self.registers[y] {
                     self.pc += 2;
@@ -212,49 +170,9 @@ impl Cpu {
                     _ => {}
                 }
             }
-            0xf000 => match instruction & 0x00ff {
-                0x07 => {
-                    self.registers[x] = self.delay_timer as u8;
-                }
-                0x0A => {
-                    self.paused = true;
-                    while self.paused {
-                        if let Some(get_pressed_key) = self.keyboard.get_key_pressed() {
-                            println!("pressed key : {:#02x}", get_pressed_key);
-                            self.registers[x] = get_pressed_key;
-                            self.paused = false;
-                        }
-                    }
-                }
-                0x15 => {
-                    self.delay_timer = self.registers[x] as u16;
-                }
-                0x18 => {
-                    self.sound_timer = self.registers[x] as u16;
-                }
-                0x1E => {
-                    self.index += self.registers[x] as u16;
-                }
-                0x29 => {
-                    self.index = (self.registers[x] * 5) as u16;
-                }
-                0x33 => {
-                    self.memory[self.index as usize] = (self.registers[x] / 100) as u8;
-                    self.memory[self.index as usize + 1] = ((self.registers[x] % 100) / 10) as u8;
-                    self.memory[self.index as usize + 2] = (self.registers[x] % 10) as u8;
-                }
-                0x55 => {
-                    for i in 0..x + 1 {
-                        self.memory[self.index as usize + i] = self.registers[i] as u8;
-                    }
-                }
-                0x65 => {
-                    for i in 0..x + 1 {
-                        self.registers[i] = self.memory[self.index as usize + i];
-                    }
-                }
-                _ => {}
-            },
+            0xf000 => {
+                self.exec_fset(instruction, x);
+            }
             _ => {
                 println!("error")
             }
@@ -268,8 +186,100 @@ impl Cpu {
         }
     }
 
+    fn exec_fset(&mut self, instruction: u16, x: usize) {
+        match instruction & 0x00ff {
+            0x07 => {
+                self.registers[x] = self.delay_timer as u8;
+            }
+            0x0A => {
+                self.paused = true;
+                while self.paused {
+                    if let Some(get_pressed_key) = self.keyboard.get_key_pressed() {
+                        println!("pressed key : {:#02x}", get_pressed_key);
+                        self.registers[x] = get_pressed_key;
+                        self.paused = false;
+                    }
+                }
+            }
+            0x15 => {
+                self.delay_timer = self.registers[x] as u16;
+            }
+            0x18 => {
+                self.sound_timer = self.registers[x] as u16;
+            }
+            0x1E => {
+                self.index += self.registers[x] as u16;
+            }
+            0x29 => {
+                self.index = (self.registers[x] * 5) as u16;
+            }
+            0x33 => {
+                self.memory[self.index as usize] = (self.registers[x] / 100) as u8;
+                self.memory[self.index as usize + 1] = ((self.registers[x] % 100) / 10) as u8;
+                self.memory[self.index as usize + 2] = (self.registers[x] % 10) as u8;
+            }
+            0x55 => {
+                for i in 0..x + 1 {
+                    self.memory[self.index as usize + i] = self.registers[i] as u8;
+                }
+            }
+            0x65 => {
+                for i in 0..x + 1 {
+                    self.registers[i] = self.memory[self.index as usize + i];
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn exec_8set(&mut self, instruction: u16, x: usize, y: usize) {
+        match instruction & 0x000f {
+            0 => self.registers[x] = self.registers[y],
+            1 => self.registers[x] = self.registers[x] | self.registers[y],
+            2 => self.registers[x] = self.registers[x] & self.registers[y],
+            3 => self.registers[x] = self.registers[x] ^ self.registers[y],
+            4 => {
+                self.registers[0xf] = 0;
+                self.registers[x] = self.registers[x]
+                    .checked_add(self.registers[y])
+                    .unwrap_or_else(|| {
+                        self.registers[0xf] = 1;
+                        return 0xff;
+                    });
+            }
+            5 => {
+                self.registers[0xf] = 0;
+                if self.registers[x] > self.registers[y] {
+                    self.registers[0xf] = 1;
+                }
+                self.registers[x] = self.registers[x]
+                    .checked_sub(self.registers[y])
+                    .unwrap_or(0);
+            }
+            6 => {
+                self.registers[0xf] = self.registers[x] & 0x0001;
+                self.registers[x] = self.registers[x].checked_div(2).unwrap();
+            }
+            7 => {
+                self.registers[0xf] = 0;
+                if self.registers[y] > self.registers[x] {
+                    self.registers[0xf] = 1;
+                }
+                self.registers[x] = self.registers[y]
+                    .checked_sub(self.registers[x])
+                    .unwrap_or(0);
+            }
+            0xe => {
+                let msb = self.registers[x].reverse_bits() & 0x0001;
+                self.registers[0xf] = msb;
+                self.registers[x] *= 2;
+            }
+            _ => {}
+        }
+    }
+
     pub async fn cycle(&mut self) {
-        for _ in 0..10 {
+        for _ in 0..self.speed {
             self.keyboard.press_key(get_keys_pressed()).await;
             self.keyboard.key_up(get_keys_released()).await;
             let mut instruction: u16 = self.memory[self.pc as usize] as u16;
@@ -292,5 +302,139 @@ impl Cpu {
         if self.delay_timer > 0 {
             self.delay_timer -= 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::Cpu;
+
+    #[test]
+    fn test_exec8_0() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0;
+        cpu.registers[1] = 0x5;
+        cpu.exec_8set(0x8000, 0, 1);
+        assert_eq!(cpu.registers[0], 0x5);
+    }
+
+    #[test]
+    fn test_exec8_1() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0;
+        cpu.registers[1] = 0xf;
+        cpu.exec_8set(0x8001, 0, 1);
+        cpu.exec_8set(0x8001, 3, 4);
+        assert_eq!(cpu.registers[3], 0x0);
+    }
+    #[test]
+    fn test_exec8_2() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0;
+        cpu.registers[1] = 0xf;
+        cpu.registers[2] = 0xf;
+        cpu.exec_8set(0x8002, 0, 1);
+        cpu.exec_8set(0x8002, 2, 1);
+        assert_eq!(cpu.registers[0], 0x0);
+        assert_eq!(cpu.registers[1], 0xf);
+    }
+    #[test]
+    fn test_exec8_3() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0;
+        cpu.registers[1] = 0xf;
+        cpu.registers[2] = 0xf;
+        cpu.exec_8set(0x8003, 0, 1);
+        cpu.exec_8set(0x8003, 2, 1);
+        cpu.exec_8set(0x8003, 4, 5);
+        assert_eq!(cpu.registers[0], 0xf);
+        assert_eq!(cpu.registers[2], 0x0);
+        assert_eq!(cpu.registers[4], 0x0);
+    }
+
+    #[test]
+    fn test_exec8_4() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0;
+        cpu.registers[1] = 0xf;
+        cpu.exec_8set(0x8004, 0, 1);
+        assert_eq!(cpu.registers[0], 0xf);
+        assert_eq!(cpu.registers[0xf], 0x0);
+    }
+    #[test]
+    fn test_exec8_4_checkf() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0xff;
+        cpu.registers[1] = 0xff;
+        cpu.exec_8set(0x8004, 0, 1);
+        assert_eq!(cpu.registers[0], 0xff);
+        assert_eq!(cpu.registers[0xf], 0x1);
+    }
+
+    #[test]
+    fn test_exec8_5() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0xff;
+        cpu.registers[1] = 0x0f;
+        cpu.exec_8set(0x8005, 0, 1);
+        assert_eq!(cpu.registers[0], 0xf0);
+        assert_eq!(cpu.registers[0xf], 1);
+    }
+
+    #[test]
+    fn test_exec8_5_vxf() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0x0f;
+        cpu.registers[1] = 0xff;
+        cpu.exec_8set(0x8005, 0, 1);
+        assert_eq!(cpu.registers[0], 0x0);
+        assert_eq!(cpu.registers[0xf], 0);
+    }
+    #[test]
+    fn test_exec8_6() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 7;
+        cpu.registers[1] = 0xff;
+        cpu.exec_8set(0x8006, 0, 1);
+        assert_eq!(cpu.registers[0], 3);
+        assert_eq!(cpu.registers[0xf], 1);
+    }
+    #[test]
+    fn test_exec8_6_vxf() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 6;
+        cpu.registers[1] = 0xff;
+        cpu.exec_8set(0x8006, 0, 1);
+        assert_eq!(cpu.registers[0], 3);
+        assert_eq!(cpu.registers[0xf], 0);
+    }
+
+    #[test]
+    fn test_exec8_7() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 7;
+        cpu.registers[1] = 0xff;
+        cpu.exec_8set(0x8007, 0, 1);
+        assert_eq!(cpu.registers[0], 255 - 7);
+        assert_eq!(cpu.registers[0xf], 1);
+    }
+
+    #[test]
+    fn test_exec8_7_vxf() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 0xff;
+        cpu.registers[1] = 7;
+        cpu.exec_8set(0x8007, 0, 1);
+        assert_eq!(cpu.registers[0], 0);
+        assert_eq!(cpu.registers[0xf], 0);
+    }
+    #[test]
+    fn test_exec8_e() {
+        let mut cpu = Cpu::default();
+        cpu.registers[0] = 4;
+        cpu.registers[1] = 7;
+        cpu.exec_8set(0x800e, 0, 1);
+        assert_eq!(cpu.registers[0], 8);
+        assert_eq!(cpu.registers[0xf], 0);
     }
 }
